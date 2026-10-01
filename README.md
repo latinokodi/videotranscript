@@ -149,8 +149,8 @@ It is **fully offline and needs no Hugging Face token or account.** Two small ON
 
 | Setting | Notes |
 |---|---|
-| **Detect automatically** | Works the cast out from the audio |
-| **Exactly N speakers** | Always more reliable when you know the answer — an interview is two — because it removes the guesswork |
+| **Detect automatically** | Works the cast out from the audio. Verified: exactly 3 speakers on a 3-voice ground-truth recording, 1 on a single-narrator clip |
+| **Exactly N speakers** | **Use this whenever you know the answer.** On a real two-person interview, automatic detection proposed 3 while forcing 2 produced a perfectly balanced 85-turns-each split of host and guest. Naming the cast is not a fallback, it is the better setting |
 
 Two details worth knowing, both measured on Windows-TTS ground truth (12 alternating turns, three voices):
 
