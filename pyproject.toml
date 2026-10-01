@@ -1,0 +1,88 @@
+[project]
+name = "videotranscript"
+version = "0.1.0"
+description = "Turn a video's audio into a transcript with accurate timestamps - 100% local, GPU-accelerated."
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "faster-whisper>=1.1.0",
+    # CUDA 12 runtime for CTranslate2. Only exists on Windows/Linux; macOS uses CPU/Metal paths.
+    "nvidia-cublas-cu12>=12.4.5.8; sys_platform == 'win32' or sys_platform == 'linux'",
+    "nvidia-cudnn-cu12>=9.0,<10; sys_platform == 'win32' or sys_platform == 'linux'",
+    "pyside6>=6.11.2",
+]
+
+[tool.uv]
+# The app is run from the source tree (uv run python gui.py), not installed.
+package = false
+# The uv cache lives on C: while this project lives on F:; hardlinks can't cross
+# filesystems, so copy instead of warning on every sync.
+link-mode = "copy"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-qt>=4.5.0",
+    "pytest-timeout>=2.4.0",
+    "ruff>=0.16.7",
+    "vulture>=2.16",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = [".venv", "media"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RET",  # return idioms
+    "PTH",  # use pathlib
+    "RUF",  # ruff-specific
+    "ARG",  # unused arguments
+    "PL",   # pylint subset
+]
+ignore = [
+    "PLR0913",  # too many arguments: Config mirrors the documented CLI surface
+    "PLR0911",  # too many returns: explicit early exits read better here
+    "PLR0912",  # too many branches: the cue builder is intentionally branchy
+    "PLR0915",  # too many statements
+    "PLR2004",  # magic values: subtitle numbers are self-explanatory
+    "RUF001",   # "ambiguous" unicode: CJK/full-width punctuation is deliberate here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002", "ARG005", "S101"]
+# Deferred imports are deliberate: faster_whisper/ctranslate2 must be imported
+# only after the Windows CUDA DLL bootstrap has run (vtcore/runtime.py), and Qt
+# may be absent on a headless CLI run.
+"vtcore/*" = ["PLC0415"]
+"vtgui/*" = ["PLC0415"]
+"gui.py" = ["PLC0415"]
+
+# Dead-code scan: `uv run vulture`. Confidence 70 keeps Qt's virtual overrides
+# (paint, headerData, closeEvent...) and dynamically dispatched `_on_<event>`
+# handlers out of the report, while still catching genuinely unused code.
+[tool.vulture]
+paths = ["vtcore", "vtgui", "transcribe.py", "gui.py", "screenshot.py", "tests"]
+min_confidence = 70
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+# No markers: the suite deliberately contains nothing that loads a model or needs
+# a GPU, because those tests are slow, depend on a download, and fail for reasons
+# unrelated to the code. End-to-end verification is a manual checklist instead -
+# see MANUAL-TESTS.md.
+
+# Optional, much heavier alternative engine (pulls PyTorch ~2.5 GB) that adds
+# wav2vec2 forced alignment for even tighter word boundaries:
+#   uv add whisperx

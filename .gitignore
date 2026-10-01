@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Only the application is tracked. start.bat rebuilds the environment with
+# `uv sync`, so nothing installed or generated belongs in the repository.
+# ---------------------------------------------------------------------------
+
+# --- Python environment (recreated by start.bat) ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- tool caches ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- tests and developer-only tooling ---
+tests/
+MANUAL-TESTS.md
+screenshot.py
+
+# --- local fixtures and generated transcripts ---
+media/
+shots/
+*.srt
+*.vtt
+*.transcript.txt
+*.transcript.json
+
+# --- editor / OS noise ---
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+
+# uv.lock is deliberately NOT ignored: it is the dependency lock that
+# start.bat's `uv sync` installs from, so every machine gets the same versions.
