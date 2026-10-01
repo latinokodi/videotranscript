@@ -2,6 +2,8 @@
 name = "videotranscript"
 version = "0.1.0"
 description = "Turn a video's audio into a transcript with accurate timestamps - 100% local, GPU-accelerated."
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "faster-whisper>=1.1.0",

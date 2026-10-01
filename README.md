@@ -372,3 +372,21 @@ console.
 ## Not included (by design)
 
 **Speaker labels** (diarization): the only good local engine is pyannote, whose models are licence-gated behind a Hugging Face token — a common source of 403s. To add it later: `uv add whisperx` (pulls PyTorch ~2.5 GB).
+
+## Licence
+
+**MIT** — see [LICENSE](LICENSE). In short: use it, change it, ship it, sell it; just keep the copyright notice and the licence text with any copy or substantial portion of it. There is no warranty.
+
+Third-party components keep their own licences and are installed from PyPI by `start.bat` rather than redistributed here:
+
+| Component | Licence |
+|---|---|
+| `faster-whisper`, `ctranslate2`, `onnxruntime` | MIT |
+| `huggingface-hub`, `tokenizers` | Apache-2.0 |
+| `tqdm` | MPL-2.0 AND MIT |
+| `PySide6` / `shiboken6` | LGPL-3.0-only (or GPL-2.0/3.0) |
+| Whisper model weights | MIT (downloaded at run time) |
+| `ffmpeg` | LGPL/GPL depending on the build; called as a separate process |
+
+If you ever publish a **packaged build** (an installer, or a zip containing the venv), the LGPL-3.0 terms for PySide6 start to apply: ship the LGPL text, offer the Qt sources, and keep the library replaceable.
+
