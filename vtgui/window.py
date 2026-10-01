@@ -408,6 +408,27 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
         self.check_overwrite = QCheckBox("Overwrite existing transcripts")
         output.add(self.check_overwrite)
 
+        self.check_diarize = QCheckBox("Label speakers (who said what)")
+        self.check_diarize.setToolTip(
+            "Works out how many people are talking and prefixes each cue with\n"
+            "'Speaker N:'. Runs on the CPU, offline, with no Hugging Face token.\n"
+            "Adds roughly a minute per hour of audio."
+        )
+        self.check_diarize.setAccessibleName("Label speakers")
+        self.check_diarize.toggled.connect(self._diarize_toggled)
+        output.add(self.check_diarize)
+
+        self.speakers_combo = QComboBox()
+        self.speakers_combo.addItem("Detect automatically", None)
+        for count in range(2, 9):
+            self.speakers_combo.addItem(f"Exactly {count} speakers", count)
+        self.speakers_combo.setAccessibleName("Number of speakers")
+        self.speakers_combo.setToolTip(
+            "Saying how many people are in the recording is always more reliable\n"
+            "than letting the app guess - an interview is two."
+        )
+        output.add(self.speakers_combo)
+
         # Quality and Output sit side by side: together they are the tallest pair
         # in the column, and pairing them is what buys the vertical room for the
         # footer and the log without a scrollbar.
@@ -704,6 +725,17 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
         self.folder_input.setEnabled(custom)
         self.btn_folder.setEnabled(custom)
 
+    def _diarize_toggled(self) -> None:
+        enabled = self.check_diarize.isChecked()
+        self.speakers_combo.setEnabled(enabled)
+        # RTTM holds speaker turns; without labels the file would be empty, so the
+        # format follows the toggle instead of being a trap the user can fall into.
+        box = self.format_boxes.get("rttm")
+        if box is not None:
+            box.setChecked(enabled)
+            box.setEnabled(enabled)
+        self._schedule_save()
+
     # ------------------------------------------------------------------ watch
 
     def add_watched_file(self, path: Path) -> None:
@@ -761,6 +793,8 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
             overwrite=self.check_overwrite.isChecked(),
             quiet=True,
             parallel_jobs=self.jobs_combo.currentData(),
+            diarize=self.check_diarize.isChecked(),
+            speakers=self.speakers_combo.currentData() if self.check_diarize.isChecked() else None,
             corrections=core.parse_corrections(fixes),
             **options,
         )
@@ -977,6 +1011,11 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
         for fmt, box in self.format_boxes.items():
             box.setChecked(fmt in formats)
 
+        self.check_diarize.setChecked(self.settings.value("diarize", False, bool))
+        speakers = self.settings.value("speakers", 0, int)
+        self.speakers_combo.setCurrentIndex(max(0, self.speakers_combo.findData(speakers or None)))
+        self._diarize_toggled()
+
         self.radio_custom.setChecked(self.settings.value("custom_folder", False, bool))
         self.folder_input.setText(self.settings.value("folder", "", str))
         self._destination_changed()
@@ -1012,6 +1051,8 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
         self.settings.setValue("custom_folder", self.radio_custom.isChecked())
         self.settings.setValue("folder", self.folder_input.text())
         self.settings.setValue("overwrite", self.check_overwrite.isChecked())
+        self.settings.setValue("diarize", self.check_diarize.isChecked())
+        self.settings.setValue("speakers", self.speakers_combo.currentData() or 0)
         self.settings.setValue("advanced", json.dumps(self.advanced))
         self.settings.setValue("preset", self.preset_combo.currentText())
         # Only the browse folder is remembered; no filename is carried over.
@@ -1036,6 +1077,7 @@ class MainWindow(PipelineEventsMixin, QMainWindow):
         self.radio_custom.toggled.connect(self._schedule_save)
         self.folder_input.textChanged.connect(self._schedule_save)
         self.check_overwrite.toggled.connect(self._schedule_save)
+        self.speakers_combo.currentIndexChanged.connect(self._schedule_save)
         self.preset_combo.currentIndexChanged.connect(self._schedule_save)
         self.path_input.textChanged.connect(self._schedule_save)
 

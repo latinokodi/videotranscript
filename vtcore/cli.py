@@ -105,6 +105,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="also skip silence longer than this around a suspected hallucination",
     )
 
+    g = p.add_argument_group("speakers")
+    g.add_argument(
+        "--diarize",
+        action="store_true",
+        help="label who said what (offline, CPU, no Hugging Face token). Adds "
+        "'Speaker N:' to the outputs and writes an RTTM when requested",
+    )
+    g.add_argument(
+        "--speakers",
+        type=int,
+        default=None,
+        metavar="N",
+        help="how many people are in the recording; naming it is more reliable "
+        "than guessing (e.g. --speakers 2 for an interview)",
+    )
+    g.add_argument(
+        "--diarize-threshold",
+        type=float,
+        default=0.70,
+        help="cosine similarity above which two segments are the same voice (default 0.70)",
+    )
+
     g = p.add_argument_group("subtitle shaping")
     g.add_argument("--max-cue-chars", type=int, default=84, help="max characters per cue (default 84)")
     g.add_argument(
@@ -183,6 +205,9 @@ def config_from_args(args: argparse.Namespace) -> Config:
         repetition_penalty=args.repetition_penalty,
         no_repeat_ngram_size=args.no_repeat_ngram_size,
         hallucination_silence_threshold=args.hallucination_silence,
+        diarize=args.diarize,
+        speakers=args.speakers,
+        diarize_threshold=args.diarize_threshold,
         max_cue_chars=args.max_cue_chars,
         max_line_chars=args.max_line_chars,
         min_cue_chars=args.min_cue_chars,

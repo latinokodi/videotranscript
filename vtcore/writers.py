@@ -13,7 +13,7 @@ from .text import fmt_timestamp
 def write_srt(cues: list[Cue], path: Path) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as fh:
         for i, cue in enumerate(cues, 1):
-            fh.write(f"{i}\n{fmt_timestamp(cue.start)} --> {fmt_timestamp(cue.end)}\n{cue.text}\n\n")
+            fh.write(f"{i}\n{fmt_timestamp(cue.start)} --> {fmt_timestamp(cue.end)}\n{cue.spoken_text()}\n\n")
 
 
 def write_vtt(cues: list[Cue], path: Path) -> None:
@@ -21,7 +21,8 @@ def write_vtt(cues: list[Cue], path: Path) -> None:
         fh.write("WEBVTT\n\n")
         for i, cue in enumerate(cues, 1):
             fh.write(
-                f"{i}\n{fmt_timestamp(cue.start, '.')} --> {fmt_timestamp(cue.end, '.')}\n{cue.text}\n\n"
+                f"{i}\n{fmt_timestamp(cue.start, '.')} --> {fmt_timestamp(cue.end, '.')}\n"
+                f"{cue.spoken_text()}\n\n"
             )
 
 
@@ -29,14 +30,29 @@ def write_txt(cues: list[Cue], path: Path) -> None:
     """Plain reading transcript: one paragraph per cue."""
     with path.open("w", encoding="utf-8", newline="\n") as fh:
         for cue in cues:
-            fh.write(cue.flat + "\n")
+            fh.write(cue.spoken_flat() + "\n")
 
 
 def write_ts_txt(cues: list[Cue], path: Path) -> None:
     """Timestamped plain text — easy to grep/skim, no subtitle syntax."""
     with path.open("w", encoding="utf-8", newline="\n") as fh:
         for cue in cues:
-            fh.write(f"{fmt_timestamp(cue.start, '.')}  {cue.flat}\n")
+            fh.write(f"{fmt_timestamp(cue.start, '.')}  {cue.spoken_flat()}\n")
+
+
+def write_rttm(turns: list[dict], path: Path, uri: str) -> None:
+    """Write the standard RTTM that pyannote's scoring tools consume.
+
+    Emitted only when diarization ran: it is the interchange format for speaker
+    turns, and without labels there is nothing to interchange.
+    """
+    with path.open("w", encoding="utf-8", newline="\n") as fh:
+        for turn in turns:
+            duration = max(0.0, turn["end"] - turn["start"])
+            fh.write(
+                f"SPEAKER {uri} 1 {fmt_timestamp(turn['start'], '.')} {duration:.3f} "
+                f"<NA> <NA> Speaker {turn['speaker'] + 1} <NA> <NA>\n"
+            )
 
 
 def write_json(cues: list[Cue], path: Path, meta: dict) -> None:
@@ -47,6 +63,7 @@ def write_json(cues: list[Cue], path: Path, meta: dict) -> None:
                 "id": i,
                 "start": round(c.start, 3),
                 "end": round(c.end, 3),
+                "speaker": c.speaker,
                 "text": c.flat,
                 "words": [
                     {
@@ -123,5 +140,10 @@ def write_outputs(cues: list[Cue], meta: dict, src: Path, cfg: Config) -> list[P
             write_json(cues, target, meta)
         elif fmt == "tsv":
             write_ts_txt(cues, target)
+        elif fmt == "rttm":
+            turns = meta.get("speaker_turns") or []
+            if not turns:
+                continue  # nothing to score without speaker labels
+            write_rttm(turns, target, src.stem)
         written.append(target)
     return written

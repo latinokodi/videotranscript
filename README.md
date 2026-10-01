@@ -139,7 +139,25 @@ Percentages are shown *beside* the bars rather than inside them — text painted
 
 ### Options
 
-**Quality presets** set the model and beam size together — *Best* (large-v3, beam 5), *Balanced* (turbo, beam 5), *Fast* (turbo, beam 1), *Draft* (tiny). Choosing a model by hand switches the preset to *Custom*. Also in-app: language (auto or 17 codes), device (auto/CUDA/CPU), **Transcribe at once** (1/2/3 files), output formats (`srt` `vtt` `txt` `json` `tsv`), destination, overwrite, **Unload model from memory**, and an **Advanced settings…** dialog (beam size, line width, cue length, pause break, jargon hint, **custom vocabulary**, **misheard-word fixes**, spacing tidy-up, VAD, context, and the three **loop defences**).
+**Quality presets** set the model and beam size together — *Best* (large-v3, beam 5), *Balanced* (turbo, beam 5), *Fast* (turbo, beam 1), *Draft* (tiny). Choosing a model by hand switches the preset to *Custom*. Also in-app: language (auto or 17 codes), device (auto/CUDA/CPU), **Transcribe at once** (1/2/3 files), output formats (`srt` `vtt` `txt` `json` `tsv` `rttm`), destination, overwrite, **Label speakers**, **Unload model from memory**, and an **Advanced settings…** dialog (beam size, line width, cue length, pause break, jargon hint, **custom vocabulary**, **misheard-word fixes**, spacing tidy-up, VAD, context, and the three **loop defences**).
+
+### Speaker labels
+
+Tick **Label speakers (who said what)** and every cue is prefixed `Speaker 1:`, `Speaker 2:`, … in the SRT, VTT, TXT and JSON, and a standard `.rttm` of the speaker turns is written for scoring tools.
+
+It is **fully offline and needs no Hugging Face token or account.** Two small ONNX models from a public re-export of pyannote's `speaker-diarization-community-1` pipeline run on the **CPU** at about **4% of realtime** — roughly 35 seconds per 15-minute video, against about 1 minute 45 for the transcription itself. No PyTorch, no GPU contention with Whisper, and nothing to download beyond ~65 MB of models.
+
+| Setting | Notes |
+|---|---|
+| **Detect automatically** | Works the cast out from the audio |
+| **Exactly N speakers** | Always more reliable when you know the answer — an interview is two — because it removes the guesswork |
+
+Two details worth knowing, both measured on Windows-TTS ground truth (12 alternating turns, three voices):
+
+* Labels go on the **first line** of a cue only, so subtitle line lengths and wrapping are exactly what they were before labels existed.
+* A span too short to prove who is talking is matched against the **voices already established** rather than guessed from the nearest neighbour in time — which is what keeps brisk back-and-forth dialogue attributed correctly instead of collapsing to one speaker.
+* Ground truth result: **12/12 turns correct, exactly 3 speakers found**, boundaries within a tenth of a second.
+
 
 ### GPU memory
 
@@ -258,6 +276,7 @@ transcribe.py   facade -> vtcore          gui.py   facade -> vtgui
 | `media.py` | paths → 16 kHz mono WAV (ffmpeg, progress, temp cleanup) | errors, runtime, text |
 | `cues.py` | `Word`/`Cue` and the cue-building rules | text |
 | `postprocess.py` | decoder-loop collapsing, vocabulary corrections | cues, text |
+| `diarize.py` | who spoke when: Kaldi fbank, ONNX segmentation + voiceprints, clustering | — |
 | `config.py` | the single options object shared by GUI and CLI | runtime |
 | `models.py` | model resolution, download, resident cache | config, errors, text |
 | `writers.py` | srt / vtt / txt / tsv / json, plus where they go and whether they are already there | config, cues, text |
@@ -371,13 +390,13 @@ console.
 
 ## Not included (by design)
 
-**Speaker labels** (diarization): the only good local engine is pyannote, whose models are licence-gated behind a Hugging Face token — a common source of 403s. To add it later: `uv add whisperx` (pulls PyTorch ~2.5 GB).
+**Speech separation** (splitting overlapping voices into separate audio tracks) and **speaker recognition across files** (matching a voice to a named person you already know). Labels are per-file only: "Speaker 1" in one video is unrelated to "Speaker 1" in another, because nothing is enrolled or stored.
 
 ## Licence
 
 **MIT** — see [LICENSE](LICENSE). In short: use it, change it, ship it, sell it; just keep the copyright notice and the licence text with any copy or substantial portion of it. There is no warranty.
 
-Third-party components keep their own licences and are installed from PyPI by `start.bat` rather than redistributed here:
+Third-party components keep their own licences and are installed from PyPI or fetched at run time rather than redistributed here:
 
 | Component | Licence |
 |---|---|
@@ -387,6 +406,26 @@ Third-party components keep their own licences and are installed from PyPI by `s
 | `PySide6` / `shiboken6` | LGPL-3.0-only (or GPL-2.0/3.0) |
 | Whisper model weights | MIT (downloaded at run time) |
 | `ffmpeg` | LGPL/GPL depending on the build; called as a separate process |
+
+### Speaker-label models (attribution required)
+
+When you turn on speaker labels, two models are downloaded at run time from
+[`altunenes/speaker-diarization-community-1-onnx`](https://huggingface.co/altunenes/speaker-diarization-community-1-onnx),
+an ONNX re-export of pyannote's
+[`speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1).
+They are **not** part of this repository and this repository does not redistribute
+them, but if you publish a build or a transcript that uses them, the licence
+requires attribution — the whole point of a CC-BY licence:
+
+| Model | Licence | Required credit |
+|---|---|---|
+| pyannote `speaker-diarization-community-1` (segmentation + WeSpeaker embedding) | **CC-BY-4.0** | "Speaker diarization by pyannote (Hervé Bredin), CC-BY-4.0" |
+| ONNX conversion by altunenes | see the model card | link to the model card |
+
+That is a licence condition, not a courtesy: CC-BY-4.0 obliges you to name the
+author of the diarization models wherever you redistribute the result. MIT on this
+repository's own code does not change it.
+
 
 If you ever publish a **packaged build** (an installer, or a zip containing the venv), the LGPL-3.0 terms for PySide6 start to apply: ship the LGPL text, offer the Qt sources, and keep the library replaceable.
 

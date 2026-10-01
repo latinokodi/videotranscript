@@ -17,6 +17,7 @@ environment just by importing `vtcore`.
 
 from __future__ import annotations
 
+from . import diarize
 from .config import DEFAULT_TEMPERATURES, FORMATS, Config, EventFn
 from .cues import BREAK_PUNCT, MIN_BREAK_CHARS, SENTENCE_END, Cue, Word, build_cues
 from .errors import FFmpegError, ModelLoadError, TranscribeError
@@ -55,6 +56,7 @@ from .writers import (
     output_target,
     write_json,
     write_outputs,
+    write_rttm,
     write_srt,
     write_ts_txt,
     write_txt,
@@ -80,6 +82,7 @@ __all__ = [
     "apply_corrections",
     "build_cues",
     "collapse_loops",
+    "diarize",
     "ensure_model_downloaded",
     "existing_transcripts",
     "expand_inputs",
@@ -108,6 +111,7 @@ __all__ = [
     "wrap_lines",
     "write_json",
     "write_outputs",
+    "write_rttm",
     "write_srt",
     "write_ts_txt",
     "write_txt",

@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 
+from . import diarize
 from .config import Config, EventFn
 from .cues import Cue, Word, build_cues
 from .media import extract_audio, probe_duration, safe_unlink
@@ -61,6 +62,11 @@ def transcribe_file(src: Path, cfg: Config, model, on_event: EventFn | None = No
 
     emit("stage", name="transcribe", label=f"Transcribing {src.name}", total=clip_seconds)
 
+    # Speaker labelling works on the decoded audio, which is a temp file that is
+    # deleted the moment transcription ends. Take the samples first so the cleanup
+    # can happen exactly once, on every path including failures.
+    diar_samples = None
+
     try:
         segments, info = model.transcribe(
             audio_input,
@@ -110,6 +116,9 @@ def transcribe_file(src: Path, cfg: Config, model, on_event: EventFn | None = No
                     closer()
     finally:
         if tmp_wav is not None:
+            if cfg.diarize:
+                with contextlib.suppress(Exception):
+                    diar_samples = diarize.read_wav_mono(tmp_wav)
             safe_unlink(tmp_wav)
 
     if not words:
@@ -158,6 +167,40 @@ def transcribe_file(src: Path, cfg: Config, model, on_event: EventFn | None = No
             style="info",
         )
 
+    speaker_turns: list[diarize.SpeakerTurn] = []
+    if cfg.diarize:
+        if diar_samples is not None:
+            emit("stage", name="diarize", label="Identifying speakers", total=clip_duration)
+            started_diarize = time.time()
+            speaker_turns = diarize.diarize(
+                diar_samples,
+                threshold=cfg.diarize_threshold,
+                num_speakers=cfg.speakers,
+                on_event=on_event,
+            )
+            labels = diarize.assign_to_spans(speaker_turns, [(cue.start, cue.end) for cue in cues])
+            for cue, label in zip(cues, labels, strict=True):
+                if label is not None:
+                    cue.speaker = diarize.speaker_name(label)
+            found = diarize.speaker_count(speaker_turns)
+            elapsed = time.time() - started_diarize
+            emit(
+                "log",
+                text=(
+                    f"speakers: {found} found in {elapsed:.1f}s "
+                    f"({len(speaker_turns)} turns, {diarize.total_speech(speaker_turns):.0f}s of speech)"
+                ),
+                style="info" if found else "warning",
+            )
+            if not found:
+                emit(
+                    "log",
+                    text="  no speech could be labelled - the file may have one voice or no speech",
+                    style="warning",
+                )
+        else:
+            emit("log", text="! speaker labels need the decoded audio; skipped", style="warning")
+
     meta = {
         "source": src.name,
         "source_path": str(src.resolve()),
@@ -182,6 +225,14 @@ def transcribe_file(src: Path, cfg: Config, model, on_event: EventFn | None = No
         "word_count": len(words),
         "cue_count": len(cues),
         "segments": seg_count,
+        "diarize": bool(cfg.diarize),
+        "speakers": diarize.speaker_count(speaker_turns),
+        "diarize_threshold": cfg.diarize_threshold if cfg.diarize else None,
+        "speaker_turns": [
+            {"start": round(turn.start, 3), "end": round(turn.end, 3), "speaker": turn.speaker}
+            for turn in speaker_turns
+        ]
+        or None,
         "elapsed_sec": round(time.time() - started, 2),
     }
     return cues, meta

@@ -79,6 +79,12 @@ class PipelineEventsMixin:
         self.set_stage("Reading audio")
         self.set_file_progress(payload.get("pct"))
 
+    def _on_diarize(self, payload: dict) -> None:
+        """Speaker labelling reports its own percentage, like every other step."""
+        self.set_stage("Identifying speakers")
+        self._stage_name = "diarize"
+        self.set_file_progress(payload.get("pct"))
+
     def _on_model_ready(self, payload: dict) -> None:
         if payload.get("cached"):
             self.append_log("model reused from cache", level="info")

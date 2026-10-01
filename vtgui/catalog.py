@@ -46,7 +46,7 @@ LANGUAGES = [
 ]
 
 
-FORMATS = ["srt", "vtt", "txt", "json", "tsv"]
+FORMATS = ["srt", "vtt", "txt", "json", "tsv", "rttm"]
 
 
 #: How many files the app will transcribe at the same time. A short list because

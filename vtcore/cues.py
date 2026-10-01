@@ -26,6 +26,8 @@ class Cue:
     end: float
     lines: list[str] = field(default_factory=list)
     words: list[Word] = field(default_factory=list)
+    #: Display name from diarization ("Speaker 1"), or None when it was not run.
+    speaker: str | None = None
 
     @property
     def text(self) -> str:
@@ -34,6 +36,22 @@ class Cue:
     @property
     def flat(self) -> str:
         return " ".join(" ".join(self.lines).split())
+
+    def spoken_text(self) -> str:
+        """Cue text prefixed with the speaker, when diarization named one.
+
+        The prefix goes on the first line only, so subtitle line lengths and
+        wrapping stay exactly as they were before labels existed.
+        """
+        if not self.speaker:
+            return self.text
+        if not self.lines:
+            return f"{self.speaker}:"
+        return "\n".join([f"{self.speaker}: {self.lines[0]}", *self.lines[1:]])
+
+    def spoken_flat(self) -> str:
+        """Single-line cue text with the speaker prefix, for plain-text output."""
+        return f"{self.speaker}: {self.flat}" if self.speaker else self.flat
 
 
 BREAK_PUNCT = re.compile(r"[,;:.!?。！？…][\"'”’)\]]*$")
